@@ -9,9 +9,6 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const CONFIG_FILE = path.join(__dirname, 'config.json');
 
-// 💡 הכנס כאן את המספר הקווי שלך בפורמט הבינלאומי (ללא פלוס או שטרודל)
-const PHONE_NUMBER_FOR_PAIRING = "97231234567"; // <-- עדכן למספר שלך!
-
 let pairingCodeDisplay = null;
 
 // טעינת נתונים מקובץ הקונפיג
@@ -82,11 +79,19 @@ const whatsappClient = new Client({
     }
 });
 
-// במקום סריקת QR, נבקש קוד רישום (Pairing Code) למספר קווי
+// בקשת קוד רישום (Pairing Code) מתוך נתוני הקונפיג
 whatsappClient.on('qr', async () => {
     try {
-        console.log('מבקש קוד רישום (Pairing Code) עבור המספר הקווי...');
-        const code = await whatsappClient.requestPairingCode(PHONE_NUMBER_FOR_PAIRING);
+        const config = loadConfig();
+        const phoneNumber = config.pairingPhoneNumber;
+        
+        if (!phoneNumber) {
+            console.error('שגיאה: שדה pairingPhoneNumber ריק בקובץ config.json!');
+            return;
+        }
+
+        console.log(`מבקש קוד רישום (Pairing Code) עבור המספר: ${phoneNumber}...`);
+        const code = await whatsappClient.requestPairingCode(phoneNumber);
         pairingCodeDisplay = code;
         console.log(`\n========================================`);
         console.log(`🔗 קוד הרישום שלך לוואטסאפ הוא: ${code}`);
@@ -113,7 +118,7 @@ whatsappClient.on('message', async (msg) => {
     const matched = config.matchadchim.find(m => m.phone === senderPhone);
 
     if (matched) {
-        console.log(`התקבל עדכון ממשודך ${matched.name}: ${updateText}`);
+        console.log(`התקבל עדכון ממשודך ${matched.name}:${updateText}`);
 
         const newUpdate = {
             name: matched.name,
@@ -126,7 +131,7 @@ whatsappClient.on('message', async (msg) => {
         config.updates.push(newUpdate);
         saveConfig(config);
 
-        const forwardMessage = `🔔 *עדכון סטטוס חדש*\n👤 מאת: ${matched.name}\n\n💬 תוכן העדכון:\n${updateText}`;
+        const forwardMessage = `🔔 *עדכון סטטוס חדש*\n👤 מאת: `${matched.name}\n\n💬 תוכן העדכון:\n${updateText}`;
         
         try {
             await whatsappClient.sendMessage(config.shadchanNumber, forwardMessage);
