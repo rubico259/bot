@@ -1,6 +1,5 @@
 const express = require('express');
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode');
 const fs = require('fs');
 const path = require('path');
 
@@ -10,8 +9,10 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const CONFIG_FILE = path.join(__dirname, 'config.json');
 
-// משתנה זמני לשמירת קוד ה-QR האחרון
-let latestQR = null;
+// 💡 שים לב: הכנס כאן את המספר הקווי שלך בפורמט הבינלאומי (ללא פלוס או שטרודל)
+const PHONE_NUMBER_FOR_PAIRING = "97231234567"; // <-- עדכן למספר שלך!
+
+let pairingCodeDisplay = null;
 
 // טעינת נתונים מקובץ הקונפיג
 function loadConfig() {
@@ -26,9 +27,8 @@ function saveConfig(configData) {
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(configData, null, 2));
 }
 
-// ==================== 1. API מקומי ====================
+// ==================== 1. API מקומי / ממשק דפדפן ====================
 
-// נתיב ראשי שמציג את קוד ה-QR כתמונה בדפדפן או הודעת סטטוס
 app.get('/', async (req, res) => {
     if (whatsappClient.info && whatsappClient.info.wid) {
         return res.send(`
@@ -39,23 +39,25 @@ app.get('/', async (req, res) => {
         `);
     }
 
-    if (!latestQR) {
+    if (!pairingCodeDisplay) {
         return res.send(`
             <html dir="rtl" style="font-family: Arial; text-align: center; padding-top: 50px;">
-                <h1>⏳ הבוט אתמול מנסה לייצר קוד QR...</h1>
+                <h1>⏳ הבוט מייצר קוד רישום למספר הקווי...</h1>
                 <p>רענן את העמוד בעוד מספר שניות.</p>
             </html>
         `);
     }
 
-    try {
-        // המרת מחרוזת ה-QR לתמונת PNG והצגתה בדפדפן
-        const qrImageBuffer = await qrcode.toBuffer(latestQR);
-        res.setHeader('Content-Type', 'image/png');
-        res.send(qrImageBuffer);
-    } catch (err) {
-        res.status(500).send('שגיאה ביצירת קוד ה-QR');
-    }
+    return res.send(`
+        <html dir="rtl" style="font-family: Arial; text-align: center; padding-top: 50px;">
+            <h1>📞 חיבור מספר קווי לוואטסאפ ביזנס</h1>
+            <p>השתמש בקוד הבא באפליקציית WhatsApp Business:</p>
+            <div style="font-size: 48px; font-weight: bold; letter-spacing: 5px; color: #007bff; margin: 30px;">
+                ${pairingCodeDisplay}
+            </div>
+            <p style="color: #666;">(הזן את הקוד תחת: קישור מכשיר -> קישור באמצעות מספר טלפון במקום)</p>
+        </html>
+    `);
 });
 
 app.get('/api/status', (req, res) => {
@@ -80,14 +82,23 @@ const whatsappClient = new Client({
     }
 });
 
-whatsappClient.on('qr', (qr) => {
-    latestQR = qr;
-    console.log('נוצר קוד QR חדש! ניתן לצפות בו בכתובת האתר שלך (Root URL).');
+// במקום סריקת QR, נבקש קוד רישום (Pairing Code) למספר קווי
+whatsappClient.on('qr', async () => {
+    try {
+        console.qlog('מבקש קוד רישום (Pairing Code) עבור המספר הקווי...');
+        const code = await whatsappClient.requestPairingCode("97286755126");
+        pairingCodeDisplay = code;
+        console.log(`\n========================================`);
+        console.log(`🔗 קוד הרישום שלך לוואטסאפ הוא: ${code}`);
+        console.log(`========================================\n`);
+    } catch (err) {
+        console.error('שגיאה בבקשת קוד רישום:', err);
+    }
 });
 
 whatsappClient.on('ready', () => {
     console.log('הבוט מחובר בהצלחה ל-WhatsApp ומוכן לעבודה!');
-    latestQR = null; // איפוס הקוד לאחר התחברות מוצלחת
+    pairingCodeDisplay = "CONNECTED";
     startAutomatedReminders();
 });
 
