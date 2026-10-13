@@ -32,7 +32,7 @@ app.get('/', async (req, res) => {
         return res.send(`
             <html dir="rtl" style="font-family: Arial; text-align: center; padding-top: 50px;">
                 <h1 style="color: green;">✅ הבוט מחובר לוואטסאפ בהצלחה!</h1>
-                <p>המערכת פעילה ומנהלת את התזכורות והעדכונים.</p>
+                <p>המערכת פעילה ומנהלת את העדכונים.</p>
             </html>
         `);
     }
@@ -57,10 +57,6 @@ app.get('/', async (req, res) => {
     `);
 });
 
-app.get('/api/status', (req, res) => {
-    res.json({ status: isConnected ? 'Online' : 'Connecting' });
-});
-
 app.listen(PORT, () => {
     console.log(`API Server is running on port ${PORT}`);
 });
@@ -83,7 +79,6 @@ whatsappClient.on('ready', () => {
     isConnected = true;
     qrCodeDataUrl = null;
     console.log('הבוט מחובר בהצלחה ל-WhatsApp ומוכן לעבודה!');
-    startAutomatedReminders();
 });
 
 whatsappClient.on('auth_failure', msg => {
@@ -95,18 +90,25 @@ whatsappClient.on('disconnected', (reason) => {
     isConnected = false;
 });
 
-// האזנה להודעות נכנסות מהמשודכים
+// האזנה גורפת לכל הודעה שנכנסת למערכת כדי לבדוק מה הבוט "רואה"
 whatsappClient.on('message', async (msg) => {
-    if (msg.from.endsWith('@g.us')) return;
+    console.log(`📥 התקבלה הודעה חדשה! מתוך: ${msg.from} | תוכן: ${msg.body}`);
+
+    if (msg.from.endsWith('@g.us')) return; // התעלמות מקבוצות
 
     const config = loadConfig();
-    const senderPhone = msg.from;
+    const senderPhone = msg.from; // לדוגמה: 972544502160@c.us
     const updateText = msg.body.trim();
 
-    const matched = config.matchadchim.find(m => m.phone === senderPhone || m.phone + '@c.us' === senderPhone);
+    // בדיקה גמישה יותר למציאת המשודך (גם אם יש או אין `@c.us`)
+    const matched = config.matchadchim.find(m => {
+        const cleanConfigPhone = m.phone.replace('@c.us', '');
+        const cleanSenderPhone = senderPhone.replace('@c.us', '');
+        return cleanConfigPhone === cleanSenderPhone;
+    });
 
     if (matched) {
-        console.log(`התקבל עדכון ממשודך ${matched.name}: ${updateText}`);
+        console.log(`✅ המשודך זוהה בהצלחה: ${matched.name}`);
 
         const newUpdate = {
             name: matched.name,
@@ -122,31 +124,16 @@ whatsappClient.on('message', async (msg) => {
         const forwardMessage = `🔔 *עדכון סטטוס חדש*\n👤 מאת: ${matched.name}\n\n💬 תוכן העדכון:\n${updateText}`;
         
         try {
+            console.log(`📤 מנסה לשלוח את ההודעה לשדכן: ${config.shadchanNumber}`);
             await whatsappClient.sendMessage(config.shadchanNumber, forwardMessage);
             await msg.reply('תודה רבה! העדכון הועבר בהצלחה לשדכן.');
-            console.log('ההודעה הועברה לשדכן בהצלחה!');
+            console.log('✨ ההודעה הועברה לשדכן בהצלחה!');
         } catch (err) {
-            console.error('שגיאה בשליחת ההודעה לשדכן:', err);
+            console.error('❌ שגיאה בשליחת ההודעה לשדכן:', err);
         }
+    } else {
+        console.log(`⚠️ המספר ${senderPhone} אינו מופיע ברשימת המשודכים המורשים בקובץ הקונפיגורציה.`);
     }
 });
-
-// תזכורות אוטומטיות
-function startAutomatedReminders() {
-    const config = loadConfig();
-    const intervalHours = config.reminderIntervalHours || 24;
-    
-    setInterval(async () => {
-        const currentConfig = loadConfig();
-        for (const m of currentConfig.matchadchim) {
-            try {
-                const target = m.phone.includes('@c.us') ? m.phone : m.phone + '@c.us';
-                await whatsappClient.sendMessage(target, `שלום ${m.name}, זוהי תזכורת אוטומטית לעדכן את הסטטוס שלך עבור השדכן.`);
-            } catch (e) {
-                console.error(`שגיאה בשליחה אל ${m.name}:`, e);
-            }
-        }
-    }, intervalHours * 60 * 60 * 1000);
-}
 
 whatsappClient.initialize();
