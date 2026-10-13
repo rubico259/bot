@@ -118,7 +118,7 @@ whatsappClient.on('message', async (msg) => {
     const matched = config.matchadchim.find(m => m.phone === senderPhone);
 
     if (matched) {
-        console.log(`התקבל עדכון ממשודך ${matched.name}:${updateText}`);
+        console.log(`התקבל עדכון ממשודך ${matched.name}: ${updateText}`);
 
         const newUpdate = {
             name: matched.name,
@@ -131,7 +131,8 @@ whatsappClient.on('message', async (msg) => {
         config.updates.push(newUpdate);
         saveConfig(config);
 
-        const forwardMessage = `🔔 *עדכון סטטוס חדש*\n👤 מאת: `${matched.name}\n\n💬 תוכן העדכון:\n${updateText}`;
+        // תוקן כאן: מחרוזת תבנית נקייה בלי תווים מיותרים
+        const forwardMessage = `🔔 *עדכון סטטוס חדש*\n👤 מאת: ${matched.name}\n\n💬 תוכן העדכון:\n${updateText}`;
         
         try {
             await whatsappClient.sendMessage(config.shadchanNumber, forwardMessage);
