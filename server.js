@@ -11,7 +11,6 @@ const CONFIG_FILE = path.join(__dirname, 'config.json');
 
 let pairingCodeDisplay = null;
 
-// טעינת נתונים מקובץ הקונפיג
 function loadConfig() {
     if (!fs.existsSync(CONFIG_FILE)) {
         console.error('שגיאה: קובץ config.json לא נמצא!');
@@ -36,23 +35,10 @@ app.get('/', async (req, res) => {
         `);
     }
 
-    if (!pairingCodeDisplay) {
-        return res.send(`
-            <html dir="rtl" style="font-family: Arial; text-align: center; padding-top: 50px;">
-                <h1>⏳ הבוט מייצר קוד רישום למספר הקווי...</h1>
-                <p>רענן את העמוד בעוד מספר שניות.</p>
-            </html>
-        `);
-    }
-
     return res.send(`
         <html dir="rtl" style="font-family: Arial; text-align: center; padding-top: 50px;">
-            <h1>📞 חיבור מספר קווי לוואטסאפ ביזנס</h1>
-            <p>השתמש בקוד הבא באפליקציית WhatsApp Business:</p>
-            <div style="font-size: 48px; font-weight: bold; letter-spacing: 5px; color: #007bff; margin: 30px;">
-                ${pairingCodeDisplay}
-            </div>
-            <p style="color: #666;">(הזן את הקוד תחת: קישור מכשיר -> קישור באמצעות מספר טלפון במקום)</p>
+            <h1>📞 בוט שידוכים פעיל</h1>
+            <p>הבוט מנסה להתחבר או שכבר מחובר ברקע.</p>
         </html>
     `);
 });
@@ -79,14 +65,14 @@ const whatsappClient = new Client({
     }
 });
 
-// בקשת קוד רישום (Pairing Code) מתוך נתוני הקונפיג
+// אירוע QR / Pairing code - יופעל רק אם אין סשן שמור
 whatsappClient.on('qr', async () => {
     try {
         const config = loadConfig();
         const phoneNumber = config.pairingPhoneNumber;
         
         if (!phoneNumber) {
-            console.error('שגיאה: שדה pairingPhoneNumber ריק בקובץ config.json!');
+            console.log('אין מספר מוגדר ל-Pairing, ממתין לחיבור רגיל...');
             return;
         }
 
@@ -97,7 +83,7 @@ whatsappClient.on('qr', async () => {
         console.log(`🔗 קוד הרישום שלך לוואטסאפ הוא: ${code}`);
         console.log(`========================================\n`);
     } catch (err) {
-        console.error('שגיאה בבקשת קוד רישום:', err);
+        console.error('הערה: לא ניתן לבקש קוד חדש (כנראה שהמספר כבר מחובר או מאומת בסשן).');
     }
 });
 
@@ -131,7 +117,6 @@ whatsappClient.on('message', async (msg) => {
         config.updates.push(newUpdate);
         saveConfig(config);
 
-        // תוקן כאן: מחרוזת תבנית נקייה בלי תווים מיותרים
         const forwardMessage = `🔔 *עדכון סטטוס חדש*\n👤 מאת: ${matched.name}\n\n💬 תוכן העדכון:\n${updateText}`;
         
         try {
