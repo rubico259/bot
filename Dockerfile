@@ -1,46 +1,20 @@
 FROM node:18-slim
 
-# התקנת כל התלויות והספריות המערכתיות הנדרשות ל-Chrome/Puppeteer
+# התקנת Chromium וכל הספריות הנדרשות לו ישירות ממערכת ההפעלה
 RUN apt-get update && apt-get install -y \
-    wget \
-    gnupg \
-    ca-certificates \
-    procps \
+    chromium \
+    fonts-ipafont-gothic \
+    fonts-wqy-zenhei \
+    fonts-thai-tlwg \
+    fonts-kacst \
+    fonts-freefont-ttf \
     libxss1 \
-    libgconf-2-4 \
-    libnss3 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxrandr2 \
-    libgbm1 \
-    libasound2 \
-    libpango-1.0-0 \
-    libc6 \
-    libxkbcommon0 \
-    libpangoft2-1.0-0 \
-    libatk1.0-0 \
-    libcairo2 \
-    libglib2.0-0 \
-    libnspr4 \
-    libx11-xcb1 \
-    libxcb1 \
-    libxfixes3 \
-    libxi6 \
-    libxcursor1 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxext6 \
-    libxfixes3 \
-    libxi6 \
-    libxrandr2 \
-    librendertext-stb0 \
-    libxtst6 \
-    xdg-utils \
-    --no-install-recommends && \
-    rm -rf /var/lib/apt/lists/*
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+# הגדרת משתנה סביבה כדי ש-Puppeteer ידע בדיוק באיזה Chromium להשתמש
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 WORKDIR /app
 
