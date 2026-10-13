@@ -10,6 +10,7 @@ const PORT = process.env.PORT || 3000;
 const CONFIG_FILE = path.join(__dirname, 'config.json');
 
 let pairingCodeDisplay = null;
+let isConnected = false;
 
 function loadConfig() {
     if (!fs.existsSync(CONFIG_FILE)) {
@@ -26,7 +27,7 @@ function saveConfig(configData) {
 // ==================== 1. API מקומי / ממשק דפדפן ====================
 
 app.get('/', async (req, res) => {
-    if (whatsappClient.info && whatsappClient.info.wid) {
+    if (isConnected) {
         return res.send(`
             <html dir="rtl" style="font-family: Arial; text-align: center; padding-top: 50px;">
                 <h1 style="color: green;">✅ הבוט מחובר לוואטסאפ בהצלחה!</h1>
@@ -35,21 +36,29 @@ app.get('/', async (req, res) => {
         `);
     }
 
+    if (!pairingCodeDisplay) {
+        return res.send(`
+            <html dir="rtl" style="font-family: Arial; text-align: center; padding-top: 50px;">
+                <h1>⏳ הבוט מייצר קוד רישום...</h1>
+                <p>רענן את העמוד בעוד מספר שניות.</p>
+            </html>
+        `);
+    }
+
     return res.send(`
         <html dir="rtl" style="font-family: Arial; text-align: center; padding-top: 50px;">
-            <h1>📞 בוט שידוכים פעיל</h1>
-            <p>הבוט מנסה להתחבר או שכבר מחובר ברקע.</p>
+            <h1>📞 חיבור מספר קווי לוואטסאפ ביזנס</h1>
+            <p>השתמש בקוד הבא באפליקציית WhatsApp Business:</p>
+            <div style="font-size: 48px; font-weight: bold; letter-spacing: 5px; color: #007bff; margin: 30px;">
+                ${pairingCodeDisplay}
+            </div>
+            <p style="color: #666;">(הזן את הקוד תחת: קישור מכשיר -> קישור באמצעות מספר טלפון)</p>
         </html>
     `);
 });
 
 app.get('/api/status', (req, res) => {
-    res.json({ status: 'Online', message: 'Bot & API are running smoothly' });
-});
-
-app.get('/api/matchadchim', (req, res) => {
-    const config = loadConfig();
-    res.json(config.matchadchim);
+    res.json({ status: isConnected ? 'Online' : 'Connecting', message: 'Bot & API status' });
 });
 
 app.listen(PORT, () => {
@@ -65,17 +74,21 @@ const whatsappClient = new Client({
     }
 });
 
-// אירוע QR / Pairing code - יופעל רק אם אין סשן שמור
+let pairingRequested = false;
+
 whatsappClient.on('qr', async () => {
+    if (isConnected || pairingRequested) return; // מונע לופ אינסופי
+    
     try {
         const config = loadConfig();
         const phoneNumber = config.pairingPhoneNumber;
         
         if (!phoneNumber) {
-            console.log('אין מספר מוגדר ל-Pairing, ממתין לחיבור רגיל...');
+            console.error('שגיאה: שדה pairingPhoneNumber ריק בקובץ config.json!');
             return;
         }
 
+        pairingRequested = true;
         console.log(`מבקש קוד רישום (Pairing Code) עבור המספר: ${phoneNumber}...`);
         const code = await whatsappClient.requestPairingCode(phoneNumber);
         pairingCodeDisplay = code;
@@ -83,25 +96,37 @@ whatsappClient.on('qr', async () => {
         console.log(`🔗 קוד הרישום שלך לוואטסאפ הוא: ${code}`);
         console.log(`========================================\n`);
     } catch (err) {
-        console.error('הערה: לא ניתן לבקש קוד חדש (כנראה שהמספר כבר מחובר או מאומת בסשן).');
+        console.error('שגיאה בבקשת קוד רישום:', err.message);
     }
 });
 
 whatsappClient.on('ready', () => {
+    isConnected = true;
     console.log('הבוט מחובר בהצלחה ל-WhatsApp ומוכן לעבודה!');
     pairingCodeDisplay = "CONNECTED";
     startAutomatedReminders();
 });
 
+whatsappClient.on('auth_failure', msg => {
+    console.error('שגיאת אימות (Auth Failure):', msg);
+    pairingRequested = false;
+});
+
+whatsappClient.on('disconnected', (reason) => {
+    console.log('הבוט התנתק:', reason);
+    isConnected = false;
+    pairingRequested = false;
+});
+
 // האזנה להודעות נכנסות מהמשודכים
 whatsappClient.on('message', async (msg) => {
-    if (msg.from.endsWith('@g.us')) return; // להתעלם מקבוצות
+    if (msg.from.endsWith('@g.us')) return;
 
     const config = loadConfig();
     const senderPhone = msg.from;
     const updateText = msg.body.trim();
 
-    const matched = config.matchadchim.find(m => m.phone === senderPhone);
+    const matched = config.matchadchim.find(m => m.phone === senderPhone || m.phone + '@c.us' === senderPhone);
 
     if (matched) {
         console.log(`התקבל עדכון ממשודך ${matched.name}: ${updateText}`);
@@ -122,6 +147,7 @@ whatsappClient.on('message', async (msg) => {
         try {
             await whatsappClient.sendMessage(config.shadchanNumber, forwardMessage);
             await msg.reply('תודה רבה! העדכון הועבר בהצלחה לשדכן.');
+            console.log('ההודעה הועברה לשדכן בהצלחה!');
         } catch (err) {
             console.error('שגיאה בשליחת ההודעה לשדכן:', err);
         }
@@ -133,16 +159,12 @@ function startAutomatedReminders() {
     const config = loadConfig();
     const intervalHours = config.reminderIntervalHours || 24;
     
-    console.log(`מערכת התזכורות הופעלה (תשלח תזכורת כל ${intervalHours} שעות).`);
-
     setInterval(async () => {
         const currentConfig = loadConfig();
-        console.log('שולח תזכורות אוטומטיות למשודכים...');
-        
         for (const m of currentConfig.matchadchim) {
             try {
-                await whatsappClient.sendMessage(m.phone, `שלום ${m.name}, זוהי תזכורת אוטומטית לעדכן את הסטטוס שלך עבור השדכן. אנא השיבו להודעה זו.`);
-                console.log(`נשלחה תזכורת אל: ${m.name}`);
+                const target = m.phone.includes('@c.us') ? m.phone : m.phone + '@c.us';
+                await whatsappClient.sendMessage(target, `שלום ${m.name}, זוהי תזכורת אוטומטית לעדכן את הסטטוס שלך עבור השדכן.`);
             } catch (e) {
                 console.error(`שגיאה בשליחה אל ${m.name}:`, e);
             }
