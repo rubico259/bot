@@ -1,6 +1,6 @@
 FROM node:18-slim
 
-# התקנת כל התלויות הנדרשות עבור דפדפן Chrome/Puppeteer בסביבת לינוקס
+# התקנת כל התלויות והספריות המערכתיות הנדרשות ל-Chrome/Puppeteer
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
@@ -27,6 +27,18 @@ RUN apt-get update && apt-get install -y \
     libnspr4 \
     libx11-xcb1 \
     libxcb1 \
+    libxfixes3 \
+    libxi6 \
+    libxcursor1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxi6 \
+    libxrandr2 \
+    librendertext-stb0 \
+    libxtst6 \
+    xdg-utils \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
