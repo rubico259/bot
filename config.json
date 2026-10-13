@@ -1,13 +1,12 @@
 {
   "pairingPhoneNumber": "97286755126",
-  "shadchanNumber": "972556637160",
+  "shadchanNumber": "972556637160@c.us",
+  "reminderIntervalHours": 24,
   "matchadchim": [
     {
-      "id": "1",
-      "name": "ראובן כהן",
-      "phone": "972544502160"
+      "name": "ראובן",
+      "phone": "972544502160@c.us"
     }
   ],
-  "reminderIntervalHours": 24,
   "updates": []
 }
