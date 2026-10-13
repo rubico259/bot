@@ -9,7 +9,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const CONFIG_FILE = path.join(__dirname, 'config.json');
 
-// 💡 שים לב: הכנס כאן את המספר הקווי שלך בפורמט הבינלאומי (ללא פלוס או שטרודל)
+// 💡 הכנס כאן את המספר הקווי שלך בפורמט הבינלאומי (ללא פלוס או שטרודל)
 const PHONE_NUMBER_FOR_PAIRING = "97231234567"; // <-- עדכן למספר שלך!
 
 let pairingCodeDisplay = null;
@@ -85,8 +85,8 @@ const whatsappClient = new Client({
 // במקום סריקת QR, נבקש קוד רישום (Pairing Code) למספר קווי
 whatsappClient.on('qr', async () => {
     try {
-        console.qlog('מבקש קוד רישום (Pairing Code) עבור המספר הקווי...');
-        const code = await whatsappClient.requestPairingCode("97286755126");
+        console.log('מבקש קוד רישום (Pairing Code) עבור המספר הקווי...');
+        const code = await whatsappClient.requestPairingCode(PHONE_NUMBER_FOR_PAIRING);
         pairingCodeDisplay = code;
         console.log(`\n========================================`);
         console.log(`🔗 קוד הרישום שלך לוואטסאפ הוא: ${code}`);
