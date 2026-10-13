@@ -65,8 +65,18 @@ app.listen(PORT, () => {
 const whatsappClient = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-        executablePath: '/usr/bin/chromium'
+        headless: true,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process',
+            '--disable-gpu'
+        ],
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium'
     }
 });
 
@@ -90,17 +100,16 @@ whatsappClient.on('disconnected', (reason) => {
     isConnected = false;
 });
 
-// האזנה גורפת לכל הודעה שנכנסת למערכת כדי לבדוק מה הבוט "רואה"
+// האזנה גורפת לכל הודעה שנכנסת למערכת
 whatsappClient.on('message', async (msg) => {
     console.log(`📥 התקבלה הודעה חדשה! מתוך: ${msg.from} | תוכן: ${msg.body}`);
 
     if (msg.from.endsWith('@g.us')) return; // התעלמות מקבוצות
 
     const config = loadConfig();
-    const senderPhone = msg.from; // לדוגמה: 972544502160@c.us
+    const senderPhone = msg.from; 
     const updateText = msg.body.trim();
 
-    // בדיקה גמישה יותר למציאת המשודך (גם אם יש או אין `@c.us`)
     const matched = config.matchadchim.find(m => {
         const cleanConfigPhone = m.phone.replace('@c.us', '');
         const cleanSenderPhone = senderPhone.replace('@c.us', '');
