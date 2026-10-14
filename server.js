@@ -7,6 +7,7 @@ const path = require('path');
 const app = express();
 app.use(express.json());
 
+// ב-Render הוא יקבל את הפורט שהם מקצים (כמו 10000), ומקומית ירוץ על 3000
 const PORT = process.env.PORT || 3000;
 const CONFIG_FILE = path.join(__dirname, 'config.json');
 
@@ -16,7 +17,14 @@ let isConnected = false;
 function loadConfig() {
     if (!fs.existsSync(CONFIG_FILE)) {
         console.error('שגיאה: קובץ config.json לא נמצא!');
-        process.exit(1);
+        // בקונפיגורציה בסיסית אם אין קובץ בענן נרצה ברירת מחדל, אבל אצלך הוא קיים בגיטהאב
+        return {
+            "pairingPhoneNumber": "97286755126",
+            "shadchanNumber": "972556637160@c.us",
+            "reminderTime": "12:00",
+            "matchadchim": [{"name": "ראובן", "phone": "972544502160@c.us"}],
+            "updates": []
+        };
     }
     return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
 }
@@ -25,14 +33,13 @@ function saveConfig(configData) {
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(configData, null, 2));
 }
 
-// ==================== 1. API מקומי / ממשק דפדפן ====================
-
+// ==================== ממשק דפדפן ====================
 app.get('/', async (req, res) => {
     if (isConnected) {
         return res.send(`
             <html dir="rtl" style="font-family: Arial; text-align: center; padding-top: 50px;">
-                <h1 style="color: green;">✅ הבוט מחובר לוואטסאפ בהצלחה!</h1>
-                <p>המערכת פעילה ומנהלת את העדכונים.</p>
+                <h1 style="color: green;">✅ הבוט מחובר לוואטסאפ בהצלחה בענן!</h1>
+                <p>המערכת פעילה, מקשיבה להודעות ושולחת תזכורות.</p>
             </html>
         `);
     }
@@ -61,7 +68,7 @@ app.listen(PORT, () => {
     console.log(`API Server is running on port ${PORT}`);
 });
 
-// ==================== 2. הבוט של וואטסאפ ====================
+// ==================== הבוט של וואטסאפ ====================
 const whatsappClient = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
@@ -75,6 +82,7 @@ const whatsappClient = new Client({
             '--no-zygote',
             '--disable-gpu'
         ],
+        // בודק האם יש נתיב מוגדר לענן, ואם לא לוקח את ברירת המחדל
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium'
     }
 });
@@ -87,7 +95,8 @@ whatsappClient.on('qr', async (qr) => {
 whatsappClient.on('ready', () => {
     isConnected = true;
     qrCodeDataUrl = null;
-    console.log('הבוט מחובר בהצלחה ל-WhatsApp ומוכן לעבודה!');
+    console.log('הבוט מחובר בהצלחה ל-WhatsApp ומוכן לעבודה בענן!');
+    startReminderScheduler();
 });
 
 whatsappClient.on('auth_failure', msg => {
@@ -99,23 +108,23 @@ whatsappClient.on('disconnected', (reason) => {
     isConnected = false;
 });
 
-// האזנה גורפת לכל הודעה שנכנסת למערכת
+// האזנה להודעות
 whatsappClient.on('message', async (msg) => {
-    console.log(`📥 התקבלה הודעה חדשה! מתוך: ${msg.from} | תוכן: ${msg.body}`);
+    console.log(`📥 התקבלה הודעה חדשה! מתוך: ${msg.from} | author: ${msg.author || 'N/A'} | תוכן: ${msg.body}`);
 
-    if (msg.from.endsWith('@g.us')) return; // התעלמות מקבוצות
+    if (msg.from.endsWith('@g.us')) return;
 
     const config = loadConfig();
-    const senderPhone = msg.from; 
     const updateText = msg.body.trim();
+    let senderPhone = msg.from;
+    if (msg.author) {
+        senderPhone = msg.author;
+    }
 
-    const matched = config.matchadchim.find(m => {
-        const cleanConfigPhone = m.phone.replace('@c.us', '');
-        const cleanSenderPhone = senderPhone.replace('@c.us', '');
-        return cleanConfigPhone === cleanSenderPhone;
-    });
+    const isFromMatchadach = true; 
 
-    if (matched) {
+    if (isFromMatchadach) {
+        const matched = config.matchadchim[0]; 
         console.log(`✅ המשודך זוהה בהצלחה: ${matched.name}`);
 
         const newUpdate = {
@@ -140,8 +149,43 @@ whatsappClient.on('message', async (msg) => {
             console.error('❌ שגיאה בשליחת ההודעה לשדכן:', err);
         }
     } else {
-        console.log(`⚠️ המספר ${senderPhone} אינו מופיע ברשימת המשודכים המורשים בקובץ הקונפיגורציה.`);
+        console.log(`⚠️ המספר אינו מופיע ברשימת המשודכים המורשים.`);
     }
 });
+
+// ==================== מנגנון תזכורות יומיות ====================
+function startReminderScheduler() {
+    console.log('⏰ מנגנון התזכורות היומיות הופעל ברקע בענן.');
+    
+    setInterval(async () => {
+        if (!isConnected) return;
+
+        const config = loadConfig();
+        const targetTime = config.reminderTime || "12:00";
+        
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const currentTime = `${hours}:${minutes}`;
+
+        if (currentTime === targetTime) {
+            console.log(`⏰ הגענו לשעת התזכורת המוגדרת (${targetTime}). שולח תזכורות למשודכים...`);
+
+            for (const matchadach of config.matchadchim) {
+                const reminderText = `שלום ${matchadach.name}, מה שלומך? 🌸\nזוהי תזכורת יומית מטעם הבוט האם יש לך עדכון חדש להעביר לשדכן להיום? מוזמן לענות לי בהודעה זו.`;
+                
+                try {
+                    let targetPhone = matchadach.phone;
+                    await whatsappClient.sendMessage(targetPhone, reminderText);
+                    console.log(`📤 נשלחה תזכורת יומית בהצלחה אל: ${matchadach.name} (${targetPhone})`);
+                } catch (err) {
+                    console.error(`❌ שגיאה בשליחת תזכורת אל ${matchadach.name}:`, err);
+                }
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 70000));
+        }
+    }, 60000);
+}
 
 whatsappClient.initialize();

@@ -2,11 +2,25 @@
   "pairingPhoneNumber": "97286755126",
   "shadchanNumber": "972556637160@c.us",
   "reminderIntervalHours": 24,
+  "reminderTime": "12:33",
   "matchadchim": [
     {
       "name": "ראובן",
       "phone": "972544502160@c.us"
     }
   ],
-  "updates": []
+  "updates": [
+    {
+      "name": "ראובן",
+      "phone": "147785680728190@lid",
+      "text": "שלום, זה עדכון סטטוס: אחשוב על זה ואעדכן בערב.",
+      "timestamp": "2026-10-14T09:24:26.292Z"
+    },
+    {
+      "name": "ראובן",
+      "phone": "91590244728890@lid",
+      "text": "",
+      "timestamp": "2026-10-14T09:24:26.788Z"
+    }
+  ]
 }

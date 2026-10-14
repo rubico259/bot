@@ -1,7 +1,6 @@
 {
-  "name": "shidduch-monolith-bot",
+  "name": "shidduch-local-bot",
   "version": "1.0.0",
-  "description": "WhatsApp Matchmaking Bot",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
